@@ -22,7 +22,7 @@ public class Main {
 
 	public static void main(String[] args) {
 		List<Point> values = generateMultivariatePoints(200);
-		values.add(new Point(10, 10, 10));
+		values.add(new Point(10, 10, 10)); // manualy add outlier
 		System.out.println("Using " + values.size() + " points...");
 		List<Function<Point, Double>> attributes = new ArrayList<>();
 		attributes.add(Point::getX);
@@ -37,7 +37,7 @@ public class Main {
 		System.out.println("----------------------------------------");
 		values.stream() //
 				.map(p -> Pair.of(p, iForest.anomalyScore(p))) //
-				.sorted(Main::descending) //
+				.sorted(Main::descendingOrder) //
 				.limit(20) //
 				.forEach(p -> {
 					System.out.printf("%3d - (%.3f, %.3f, %.3f) = %.3f\n", values.indexOf(p.getKey()) + 1,
@@ -45,7 +45,7 @@ public class Main {
 				});
 	}
 
-	public static int descending(Pair<Point, Double> x, Pair<Point, Double> y) {
+	public static int descendingOrder(Pair<Point, Double> x, Pair<Point, Double> y) {
 		return Double.compare(y.getValue(), x.getValue());
 	}
 
