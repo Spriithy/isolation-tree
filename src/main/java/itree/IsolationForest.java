@@ -18,34 +18,79 @@ import lombok.NonNull;
 @Data
 public class IsolationForest<T> {
 
-	public static final int DEFAULT_HEIGHT_LIMIT = 255;
+	/**
+	 * For large amounts of data, 100 iTrees are sufficient.
+	 */
 	public static final int DEFAULT_NUMBER_OF_TREES = 100;
-	public static final int DEFAULT_SUBSAMPLING_SIZE = 256;
 
+	/**
+	 * When processing large datasets, it is a loss of processing time and memory to
+	 * use more than 256 as a sample size. Indeed, the ratio precision gained over
+	 * efficiency loss is not interesting enough.
+	 */
+	public static final int DEFAULT_SAMPLING_SIZE = 256;
+
+	/**
+	 * The number of trees to generate.
+	 */
 	private int numberOfTrees;
+
+	/**
+	 * The size of the samples used to generate trees.
+	 */
 	private int samplingSize;
+
+	/**
+	 * The height threshold at which the evaluation algorithm will stop exploring an
+	 * iTree.
+	 */
 	private int heightLimit;
+
+	/**
+	 * The dataset to process.
+	 */
 	private List<T> values;
+
+	/**
+	 * The attributes the algorithm will use to score values.
+	 */
 	private List<Function<T, Double>> attributes;
+
+	/**
+	 * The iTrees composing the iForest.
+	 */
 	private Set<IsolationTreeNode<T>> isolationForest;
 
-	private final double c;
+	/**
+	 * The average path length of unsuccessful searches in an iTree.
+	 */
+	private double cFactor;
 
+	/**
+	 * 
+	 * @param values
+	 * @param attributes
+	 * @param numberOfTrees
+	 * @param samplingSize
+	 * @param heightLimit
+	 */
 	public IsolationForest(@NonNull List<T> values, @NonNull List<Function<T, Double>> attributes, int numberOfTrees,
-			int subsamplingSize, int heightLimit) {
-		if (subsamplingSize > values.size()) {
-			throw new IllegalArgumentException("subsamplingSize > values.size()");
-		}
-		this.heightLimit = heightLimit;
+			int samplingSize, int heightLimit) {
 		this.numberOfTrees = numberOfTrees;
-		this.samplingSize = subsamplingSize;
 		this.values = values;
 		this.attributes = attributes;
-		c = computeC(subsamplingSize);
+		setSamplingSize(samplingSize);
+		this.heightLimit = Math.min(heightLimit, this.heightLimit);
 	}
 
 	public IsolationForest(@NonNull List<T> values, @NonNull List<Function<T, Double>> attributes) {
-		this(values, attributes, DEFAULT_NUMBER_OF_TREES, DEFAULT_SUBSAMPLING_SIZE, DEFAULT_HEIGHT_LIMIT);
+		this(values, attributes, DEFAULT_NUMBER_OF_TREES, DEFAULT_SAMPLING_SIZE, DEFAULT_SAMPLING_SIZE - 1);
+	}
+
+	public void setSamplingSize(int samplingSize) {
+		this.samplingSize = samplingSize;
+		this.heightLimit = samplingSize - 1;
+		cFactor = computeCFactor(samplingSize);
 	}
 
 	public void buildForest() {
@@ -62,7 +107,7 @@ public class IsolationForest<T> {
 
 	public double pathLength(T value, IsolationTreeNode<T> iTree, int heightLimit, int pathLength) {
 		if (iTree.isExternal() || pathLength >= heightLimit) {
-			return pathLength + computeC(iTree.getSize());
+			return pathLength + computeCFactor(iTree.getSize());
 		}
 		Function<T, Double> splitAttribute = iTree.getSplitAttribute();
 		if (splitAttribute.apply(value) < iTree.getSplitValue()) {
@@ -76,7 +121,7 @@ public class IsolationForest<T> {
 				.mapToDouble(iTree -> pathLength(value, iTree, heightLimit)) //
 				.average() //
 				.getAsDouble();
-		return Math.pow(2, -2 * (averagePathLength / c));
+		return Math.pow(2, -2 * (averagePathLength / cFactor));
 	}
 
 	private static <T> List<T> randomSample(List<T> items, int m) {
@@ -99,9 +144,9 @@ public class IsolationForest<T> {
 		return sample;
 	}
 
-	private double computeC(double psi) {
+	private double computeCFactor(double psi) {
 		if (psi > 2) {
-			return 2 * H(psi - 1) - 2 * (psi - 1) / values.size();
+			return 2 * H(psi - 1) - 2 * (psi - 1) / psi;
 		}
 		return psi == 2 ? 1 : 0;
 	}

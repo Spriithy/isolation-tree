@@ -1,12 +1,15 @@
 package itree;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 
 /**
  * 
@@ -16,29 +19,29 @@ import org.apache.commons.lang3.tuple.Pair;
 public class Main {
 
 	private static final Random RANDOM = new Random();
-	private static final int OBSERVATION_COUNT = 100;
-	private static final int OUTLIER_COUNT = 10;
 
 	public static void main(String[] args) {
-		List<Point> values = generatePoints();
+		List<Point> values = generateMultivariatePoints(200);
+		values.add(new Point(10, 10, 10));
 		System.out.println("Using " + values.size() + " points...");
 		List<Function<Point, Double>> attributes = new ArrayList<>();
 		attributes.add(Point::getX);
 		attributes.add(Point::getY);
-		IsolationForest<Point> iForest = new IsolationForest<>(values, attributes, 100, 64, 63);
+		attributes.add(Point::getZ);
+		attributes.add(Point::norm);
+		IsolationForest<Point> iForest = new IsolationForest<>(values, attributes);
 		System.out.println("Building iForest [numberOfTrees=" + iForest.getNumberOfTrees() + ", samplingSize="
 				+ iForest.getSamplingSize() + "] ...");
 		iForest.buildForest();
-		System.out.println("10 most 'abnormal' points (or outliers):");
+		System.out.println("20 highest anomaly scored values (possible outliers):");
 		System.out.println("----------------------------------------");
-		double averageAnomalyScore = values.stream().mapToDouble(iForest::anomalyScore).average().getAsDouble();
 		values.stream() //
 				.map(p -> Pair.of(p, iForest.anomalyScore(p))) //
 				.sorted(Main::descending) //
-				.limit(10) //
+				.limit(20) //
 				.forEach(p -> {
-					System.out.println((values.indexOf(p.getKey()) + 1) + " - " + p.getKey().toString()
-							+ "\tanomalyScore=" + p.getValue() + "\tdeviation=" + (p.getValue() - averageAnomalyScore));
+					System.out.printf("%3d - (%.3f, %.3f, %.3f) = %.3f\n", values.indexOf(p.getKey()) + 1,
+							p.getKey().getX(), p.getKey().getY(), p.getKey().getZ(), p.getValue());
 				});
 	}
 
@@ -46,20 +49,24 @@ public class Main {
 		return Double.compare(y.getValue(), x.getValue());
 	}
 
-	public static List<Point> generatePoints() {
+	public static List<Point> generateMultivariatePoints(int n) {
+		MultivariateNormalDistribution distribution = new MultivariateNormalDistribution(new double[] { 0, 0 },
+				new double[][] { { 1, 0 }, { 0, 1 } });
+		return Arrays.stream(distribution.sample(n)).map(x -> new Point(x[0], x[1], 0)).collect(Collectors.toList());
+	}
+
+	public static List<Point> generatePoints(int normalCount, int outlierCount) {
 		double xMean = 0;
 		double xStdDev = 0.2d;
 		double yMean = 0;
 		double yStdDev = 0.2d;
 		System.out.println("Generating points...");
-		List<Point> points = new ArrayList<>(OBSERVATION_COUNT);
-		// Generate 99% legit values
-		for (int i = 0; i < OBSERVATION_COUNT - OUTLIER_COUNT; i++) {
+		List<Point> points = new ArrayList<>(normalCount + outlierCount);
+		for (int i = 0; i < normalCount; i++) {
 			points.add(generatePoint(xMean, xStdDev, yMean, yStdDev));
 		}
-		// Generate 1% outliers
-		for (int i = 0; i < OUTLIER_COUNT; i++) {
-			points.add(generatePoint(-5.5d, 0.1d, 3.5d, 0.1d));
+		for (int i = 0; i < outlierCount; i++) {
+			points.add(generatePoint(-50.5d, 1d, 135d, 5d));
 		}
 		Collections.shuffle(points);
 		return points;
@@ -82,7 +89,6 @@ public class Main {
 		points.add(new Point(0.2, -0.1, 0));
 		points.add(new Point(0.2, 0.2, 0));
 		points.add(new Point(0.2, -0.2, 0));
-
 		points.add(new Point(-3, 3, 0));
 		points.add(new Point(-100, 3, 0));
 		points.add(new Point(5, 2, 0));
