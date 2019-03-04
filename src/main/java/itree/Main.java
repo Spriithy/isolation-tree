@@ -21,18 +21,21 @@ public class Main {
 	private static final Random RANDOM = new Random();
 
 	public static void main(String[] args) {
-		List<Point> values = generateMultivariatePoints(200);
-		values.add(new Point(10, 10, 10)); // manualy add outlier
+//		List<Point> values = generateMultivariatePoints(200);
+//		values.add(new Point(100, 100, 100));
+		List<Point> values = simple();
 		System.out.println("Using " + values.size() + " points...");
 		List<Function<Point, Double>> attributes = new ArrayList<>();
 		attributes.add(Point::getX);
 		attributes.add(Point::getY);
 		attributes.add(Point::getZ);
-		attributes.add(Point::norm);
-		IsolationForest<Point> iForest = new IsolationForest<>(values, attributes);
-		System.out.println("Building iForest [numberOfTrees=" + iForest.getNumberOfTrees() + ", samplingSize="
-				+ iForest.getSamplingSize() + "] ...");
-		iForest.buildForest();
+		System.out.println("Preparing iForest...");
+		IsolationForest<Point> iForest = new IsolationForest.Builder<Point>(Point.class) //
+				.attributes(attributes) //
+				.values(values) //
+				.build();
+		System.out.println("Buildt iForest [numberOfTrees=" + iForest.getNumberOfTrees() + ", samplingSize="
+				+ iForest.getSamplingSize() + "]");
 		System.out.println("20 highest anomaly scored values (possible outliers):");
 		System.out.println("----------------------------------------");
 		values.stream() //
@@ -42,10 +45,11 @@ public class Main {
 				.forEach(p -> {
 					System.out.printf("%3d - (%.3f, %.3f, %.3f) = %.3f\n", values.indexOf(p.getKey()) + 1,
 							p.getKey().getX(), p.getKey().getY(), p.getKey().getZ(), p.getValue());
+//					System.out.printf("%3d - %s = %.3f\n", values.indexOf(p.getKey()) + 1, p.getKey(), p.getValue());
 				});
 	}
 
-	public static int descendingOrder(Pair<Point, Double> x, Pair<Point, Double> y) {
+	public static <T> int descendingOrder(Pair<T, Double> x, Pair<T, Double> y) {
 		return Double.compare(y.getValue(), x.getValue());
 	}
 
@@ -60,7 +64,6 @@ public class Main {
 		double xStdDev = 0.2d;
 		double yMean = 0;
 		double yStdDev = 0.2d;
-		System.out.println("Generating points...");
 		List<Point> points = new ArrayList<>(normalCount + outlierCount);
 		for (int i = 0; i < normalCount; i++) {
 			points.add(generatePoint(xMean, xStdDev, yMean, yStdDev));
@@ -89,7 +92,6 @@ public class Main {
 		points.add(new Point(0.2, -0.1, 0));
 		points.add(new Point(0.2, 0.2, 0));
 		points.add(new Point(0.2, -0.2, 0));
-		points.add(new Point(-3, 3, 0));
 		points.add(new Point(-100, 3, 0));
 		points.add(new Point(5, 2, 0));
 		points.add(new Point(-10, -5, 0));

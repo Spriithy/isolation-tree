@@ -1,9 +1,11 @@
 package itree;
 
 import java.util.List;
-import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.apache.commons.math3.distribution.UniformIntegerDistribution;
+import org.apache.commons.math3.distribution.UniformRealDistribution;
 
 import lombok.Data;
 import lombok.NonNull;
@@ -22,11 +24,18 @@ public class IsolationTreeNode<T> {
 	private IsolationTreeNode<T> right;
 	private int size;
 
-	public IsolationTreeNode(@NonNull List<T> values, @NonNull List<Function<T, Double>> attributes) {
-		this.splitAttribute = attributes.get(new Random().nextInt(attributes.size()));
+	IsolationTreeNode(@NonNull List<T> values, @NonNull List<Function<T, Double>> attributes) {
+		UniformIntegerDistribution randomAttributeSelector = new UniformIntegerDistribution(0, attributes.size() - 1);
+		this.splitAttribute = attributes.get(randomAttributeSelector.sample());
 		double min = values.stream().mapToDouble(splitAttribute::apply).min().getAsDouble();
 		double max = values.stream().mapToDouble(splitAttribute::apply).max().getAsDouble();
-		splitValue = min + Math.random() * max;
+		if (min == max) {
+			// values aren't partitionable
+			size = values.size();
+			return;
+		}
+		UniformRealDistribution randomSplitValueSelector = new UniformRealDistribution(min, max);
+		splitValue = randomSplitValueSelector.sample();
 		List<T> leftValues = values.stream().filter(x -> splitAttribute.apply(x) < splitValue)
 				.collect(Collectors.toList());
 		List<T> rightValues = values.stream().filter(x -> splitAttribute.apply(x) >= splitValue)
